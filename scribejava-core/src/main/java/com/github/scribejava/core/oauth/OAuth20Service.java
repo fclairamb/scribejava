@@ -77,6 +77,42 @@ public class OAuth20Service extends OAuthService {
         return request;
     }
 
+    public final OAuth2AccessToken refreshOAuth2AccessToken(OAuth2AccessToken refreshToken) {
+        final Response response = createRefreshTokenRequest(refreshToken,
+                new OAuthRequest(api.getAccessTokenVerb(), api.getAccessTokenEndpoint(), this)).send();
+        return api.getAccessTokenExtractor().extract(response.getBody());
+    }
+
+    public final Future<OAuth2AccessToken> refreshAccessTokenAsync(OAuth2AccessToken refreshToken,
+            OAuthAsyncRequestCallback<OAuth2AccessToken> callback) {
+        return refreshAccessTokenAsync(refreshToken, callback, null);
+    }
+
+    public final Future<OAuth2AccessToken> refreshAccessTokenAsync(OAuth2AccessToken refreshToken,
+            OAuthAsyncRequestCallback<OAuth2AccessToken> callback, ProxyServer proxyServer) {
+        final OAuthRequestAsync request = createRefreshTokenRequest(refreshToken,
+                new OAuthRequestAsync(api.getAccessTokenVerb(), api.getAccessTokenEndpoint(), this));
+        return request.sendAsync(callback, new OAuthRequestAsync.ResponseConverter<OAuth2AccessToken>() {
+            @Override
+            public OAuth2AccessToken convert(com.ning.http.client.Response response) throws IOException {
+                return getApi().getAccessTokenExtractor()
+                        .extract(OAuthRequestAsync.RESPONSE_CONVERTER.convert(response).getBody());
+            }
+        }, proxyServer);
+    }
+
+    protected <T extends AbstractRequest> T createRefreshTokenRequest(OAuth2AccessToken refreshToken, T request) {
+        if (refreshToken.getRefreshToken() == null) {
+            throw new IllegalArgumentException("The access token passed in does not contain a refresh token");
+        }
+        final OAuthConfig config = getConfig();
+        request.addParameter(OAuthConstants.CLIENT_ID, config.getApiKey());
+        request.addParameter(OAuthConstants.CLIENT_SECRET, config.getApiSecret());
+        request.addParameter(OAuthConstants.REFRESH_TOKEN, refreshToken.getRefreshToken());
+        request.addParameter(OAuthConstants.GRANT_TYPE, OAuthConstants.REFRESH_TOKEN);
+        return request;
+    }
+
     /**
      * {@inheritDoc}
      */
